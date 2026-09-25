@@ -16,7 +16,7 @@ import type { RepoStats, WorkflowConclusion } from "./types.js";
 export type Octokit = InstanceType<typeof GitHub>;
 
 /** Fenster fuer `commitsLast7Days` – haengt an SATIETY_* in state.ts. */
-const COMMIT_WINDOW_DAYS = 7;
+export const COMMIT_WINDOW_DAYS = 7;
 
 /** Fenster fuer `closedIssuesLast30Days`. */
 const CLOSED_ISSUE_WINDOW_DAYS = 30;

@@ -1,47 +1,134 @@
 # repo-pet
 
-GitHub Action, die den Zustand eines Repos als Tamagotchi-Kreatur rendert.
+[![Release](https://img.shields.io/github/v/release/sascha910-RS/repo-pet?label=release)](https://github.com/sascha910-RS/repo-pet/releases) [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE) · [English](README.en.md)
 
-Eigenstaendiges Projekt – TypeScript, Node 20, ESM.
+Eine GitHub Action, die aus Commit-Aktivität, CI-Status und Issue-Hygiene
+deines Repos ein Pixel-Haustier rendert und das animierte SVG täglich in
+einen eigenen Branch legt.
 
-## Stand
+## Das Pet dieses Repos
 
-Session 1 von 4: Stats-Sammler und Zustandsableitung. Noch kein SVG, noch
-keine Action-Verpackung.
+![repo-pet](https://raw.githubusercontent.com/sascha910-RS/repo-pet/pet-output/pet.svg)
 
-## Module
+Live erzeugt, täglich um 06:17 UTC.
 
-- `src/types.ts` – gemeinsame Typen (`RepoStats`, `PetState`, `Mood`)
-- `src/state.ts` – `deriveState(stats)`, rein und ohne Netzwerk. Alle
-  Schwellwerte stehen als benannte Konstanten oben in der Datei und sind
-  dort begruendet.
-- `src/stats.ts` – `collectStats(octokit, owner, repo)` gegen die GitHub-
-  REST-API. Fehlende Features (kein CI, keine Issues, leeres Repo) ergeben
-  neutrale Defaults; ein erschoepftes Kontingent wirft `RateLimitError`.
+## Die vier Zustände
 
-## Befehle
+| happy | content | sad | sick |
+| :---: | :---: | :---: | :---: |
+| ![happy](docs/gallery/happy.svg) | ![content](docs/gallery/content.svg) | ![sad](docs/gallery/sad.svg) | ![sick](docs/gallery/sick.svg) |
 
-```bash
-npm install
-npm test          # vitest
-npm run typecheck # tsc --noEmit
-npm run build     # nach dist/
-npm run demo -- owner/repo
+Die Breite zeigt die Sättigung, die Farbsättigung die Gesundheit. Die zwei
+Balken darunter sind Sättigung und Gesundheit als Zahlenwert.
+
+## Quick start
+
+```yaml
+name: repo-pet
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: sascha910-RS/repo-pet@v1
+        with:
+          github_token: ${{ github.token }}
 ```
 
-Die Demo braucht ein Token aus `GITHUB_TOKEN` oder `GH_TOKEN`; ersatzweise
-zieht sie eines aus `gh auth token`. Sie schreibt JSON nach stdout und
-Diagnosen nach stderr, laesst sich also nach `jq` weiterreichen.
+Danach einmal von Hand unter *Actions* starten, dann ins README:
 
-## Zustandsmodell
+```markdown
+![repo-pet](https://raw.githubusercontent.com/OWNER/REPO/pet-output/pet.svg)
+```
 
-`satiety` (0-100) kommt aus den Commits der letzten 7 Tage und sinkt mit
-jedem Tag Stillstand nach einer Schonfrist von zwei Tagen. `health` (0-100)
-startet bei einer neutralen Baseline und wird vom letzten CI-Ergebnis sowie
-vom Verhaeltnis offener zu kuerzlich geschlossenen Issues verschoben.
-`mood` kombiniert beides, wobei Krankheit Vorrang hat: rotes CI bleibt
-sichtbar, auch wenn fleissig committed wird.
+## Inputs
 
-Ein brandneues, leeres Repo landet bewusst auf `sad` – es hat nichts zu
-fressen, unterscheidet sich damit aber sauber vom verwahrlosten Repo mit
-rotem CI (`sick`).
+| Input | Default | Bedeutung |
+| --- | --- | --- |
+| `github_token` | — (Pflicht) | Üblich `${{ github.token }}`. Der Job braucht `contents: write`. |
+| `output_branch` | `pet-output` | Branch für das SVG. Existiert er nicht, wird er als Orphan angelegt. |
+| `output_filename` | `pet.svg` | Pfad im Branch. Unterordner sind erlaubt. |
+| `repository` | aktuelles Repo | Gemessen wird dieses Repo, committet wird immer ins eigene. |
+| `dry_run` | `false` | Rendert und zeigt das Ergebnis in der Job Summary, schreibt nichts. |
+
+## Outputs
+
+| Output | Beispiel |
+| --- | --- |
+| `mood` | `content` |
+| `satiety` | `64` |
+| `health` | `52` |
+| `svg_url` | `https://raw.githubusercontent.com/…/pet.svg` (leer bei `dry_run`) |
+
+## Wie der Zustand berechnet wird
+
+**Sättigung** kommt aus den Commits der letzten 7 Tage: 14 Commits sind voll.
+Davon abgezogen werden 12 Punkte pro Tag ohne Commit, nach 2 Tagen Schonfrist
+— ein Wochenende kostet also nichts.
+
+**Gesundheit** startet bei 70. Grünes CI gibt +25, rotes −45, abgebrochenes
+−10. Dazu das Verhältnis offener zu kürzlich geschlossenen Issues: bis +10,
+bis −25.
+
+**Stimmung** in fester Reihenfolge, Krankheit zuerst:
+
+| | |
+| --- | --- |
+| `sick` | Gesundheit unter 40 |
+| `happy` | Sättigung ≥ 70 **und** Gesundheit ≥ 70 |
+| `sad` | Sättigung unter 35 |
+| `content` | alles andere |
+
+Fehlende Daten kosten nie Abzug. Ein Repo ohne CI ist nicht krank, nur
+unbekannt. Ein leeres Repo landet auf `sad`, nicht auf `sick`.
+
+Alle Schwellwerte stehen als benannte Konstanten oben in
+[`src/state.ts`](src/state.ts).
+
+## FAQ
+
+**Warum ein eigener Branch?**
+Das SVG ändert sich potenziell täglich. Im Default-Branch würde es die
+Historie des Codes zumüllen.
+
+**Wie schnell ist ein Update sichtbar?**
+Nach spätestens fünf Minuten. `raw.githubusercontent.com` läuft nicht über
+Camo, die übliche Badge-Cache-Problematik entfällt. Kein Cache-Buster nötig
+— Details in [docs/caching.md](docs/caching.md).
+
+**Es ist kein Commit entstanden.**
+Dann hat sich nichts geändert. Die Action vergleicht den Git-Blob-Hash und
+überspringt identische Inhalte; eine Historie aus gleichen Commits wäre nur
+Rauschen.
+
+**„Resource not accessible by integration"**
+Dem Job fehlt `permissions: contents: write`. Steht das schon da, muss unter
+*Settings → Actions → General* auch „Workflow permissions" auf „Read and
+write" stehen.
+
+**Kann ich ein fremdes Repo beobachten?**
+Ja, über `repository`. Das SVG landet trotzdem in deinem Repo.
+
+**Warum ist die Animation reines CSS?**
+`raw.githubusercontent.com` liefert SVGs mit
+`default-src 'none'; …; sandbox`. JavaScript und SMIL sind dort tot,
+`style-src 'unsafe-inline'` erlaubt den Style-Block ausdrücklich.
+
+## Entwicklung
+
+Siehe [CONTRIBUTING.md](CONTRIBUTING.md). Kurz: `npm run preview` schreibt
+eine `preview.html` mit allen Stimmungen in drei Breiten auf hellem und
+dunklem Grund.
+
+## Lizenz
+
+MIT, siehe [LICENSE](LICENSE).
