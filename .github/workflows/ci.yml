@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Dieselbe Version, die action.yml als Runtime deklariert.
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # dist/ ist eingecheckt und muss zum Quelltext passen, sonst laeuft in
+      # fremden Repos eine andere Version als die hier sichtbare.
+      - run: npm run build:check

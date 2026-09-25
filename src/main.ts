@@ -1,0 +1,235 @@
+/**
+ * Der Ablauf der Action: sammeln, ableiten, rendern, veroeffentlichen.
+ *
+ * `runAction()` bekommt alles, was es braucht, als Parameter – Octokit, die
+ * geprueften Inputs und einen Ausgabekanal. Es importiert `@actions/core`
+ * nicht. Das Verdrahten mit der echten Umgebung passiert in `entry.ts`.
+ *
+ * Der Grund ist derselbe wie bei `deriveState()`: was seine Abhaengigkeiten
+ * als Parameter nimmt, laesst sich ohne Modul-Mocks testen. Ein Test stellt
+ * hier ein Octokit-Double und einen Sammler hin und liest hinterher ab, was
+ * passiert ist – inklusive der Frage, ob ueberhaupt etwas geschrieben wurde.
+ */
+
+import { publishSvg, type PublishOutcome } from "./publish.js";
+import { renderPet } from "./render.js";
+import { collectStats, RateLimitError, type Octokit } from "./stats.js";
+import { deriveState } from "./state.js";
+import { InputError, type ActionInputs } from "./inputs.js";
+import type { PetState, RepoStats } from "./types.js";
+
+/**
+ * Der Ausgabekanal der Action.
+ *
+ * Deckt genau den Ausschnitt von `@actions/core` ab, den der Ablauf benutzt.
+ * Eng gehalten, damit ein Test ihn in fuenf Zeilen nachbauen kann.
+ */
+export interface ActionIo {
+  info(message: string): void;
+  warning(message: string): void;
+  setOutput(name: string, value: string): void;
+  writeSummary(markdown: string): Promise<void>;
+}
+
+export interface ActionDeps {
+  readonly octokit: Octokit;
+  readonly inputs: ActionInputs;
+  readonly io: ActionIo;
+  /** Referenzzeitpunkt, ueberschreibbar fuer Tests. Default: jetzt. */
+  readonly now?: Date;
+}
+
+/**
+ * Wie der Lauf ausgegangen ist.
+ *
+ * `"dry-run"` und `"unchanged"` erzeugen beide keinen Commit, sind aber
+ * nicht dasselbe: im zweiten Fall *liegt* die Datei da und hat eine URL.
+ * Ein einzelnes Boolean hat diesen Unterschied verschluckt.
+ */
+export type ActionOutcome = "dry-run" | PublishOutcome;
+
+export interface ActionResult {
+  readonly stats: RepoStats;
+  readonly state: PetState;
+  readonly svg: string;
+  /** URL der abgelegten Datei. Leer nur bei `dry_run`. */
+  readonly svgUrl: string;
+  readonly outcome: ActionOutcome;
+}
+
+/**
+ * Die URL, unter der das SVG spaeter haengt.
+ *
+ * `raw.githubusercontent.com` und nicht `github.com/.../blob/...`: nur die
+ * raw-Adresse liefert `content-type: image/svg+xml` und laesst sich damit in
+ * ein `<img>` haengen. Siehe `docs/caching.md`.
+ */
+export function svgRawUrl(inputs: ActionInputs): string {
+  const { owner, repo } = inputs.target;
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${inputs.outputBranch}/${inputs.outputFilename}`;
+}
+
+/**
+ * Die Zusammenfassung fuer den Actions-Tab.
+ *
+ * Das SVG haengt als `data:`-URI im Bild, weil es zum Zeitpunkt des Schreibens
+ * noch keine URL hat – bei `dry_run` bekommt es auch nie eine. Ob GitHubs
+ * Sanitizer `data:`-Bilder in Job Summaries durchlaesst, ist nicht
+ * dokumentiert; deshalb steht die Tabelle darueber und bei `dry_run` der
+ * Quelltext darunter. Faellt das Bild weg, ist die Zusammenfassung trotzdem
+ * vollstaendig.
+ */
+export function buildSummary(result: ActionResult, inputs: ActionInputs): string {
+  const { state, stats } = result;
+  const dataUri = `data:image/svg+xml;base64,${Buffer.from(result.svg, "utf8").toString("base64")}`;
+
+  const lines = [
+    "## repo-pet",
+    "",
+    `<img src="${dataUri}" alt="repo-pet: ${state.mood}" width="112" height="120">`,
+    "",
+    "| | |",
+    "| --- | --- |",
+    `| Stimmung | \`${state.mood}\` |`,
+    `| Saettigung | ${state.satiety} / 100 |`,
+    `| Gesundheit | ${state.health} / 100 |`,
+    `| Gemessen an | \`${inputs.source.owner}/${inputs.source.repo}\` |`,
+    "",
+    "<details><summary>Rohdaten</summary>",
+    "",
+    "```json",
+    JSON.stringify(stats, null, 2),
+    "```",
+    "",
+    "</details>",
+  ];
+
+  const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
+
+  if (result.outcome === "created") {
+    lines.push("", `Branch \`${inputs.outputBranch}\` angelegt, SVG liegt unter ${ort}.`);
+  } else if (result.outcome === "updated") {
+    lines.push("", `Aktualisiert: ${ort}.`);
+  } else if (result.outcome === "unchanged") {
+    lines.push("", `Unveraendert, kein Commit noetig. Unveraendert liegt es unter ${ort}.`);
+  } else {
+    lines.push(
+      "",
+      "> **dry_run** – nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.",
+      "",
+      "<details><summary>SVG-Quelltext</summary>",
+      "",
+      "```xml",
+      result.svg,
+      "```",
+      "",
+      "</details>",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Uebersetzt einen Fehler in eine Meldung, die dem Lesenden weiterhilft.
+ *
+ * Die drei Faelle unten sind die, die real vorkommen. Besonders der erste:
+ * ein fehlendes `permissions: contents: write` meldet die API als
+ * "Resource not accessible by integration" – ein Satz, der nicht verraet,
+ * was zu tun ist. Genau deshalb steht er hier.
+ */
+export function describeFailure(error: unknown): string {
+  if (error instanceof InputError) return error.message;
+
+  if (error instanceof RateLimitError) {
+    const until = error.resetAt ? ` Wieder ab ${error.resetAt.toISOString()}.` : "";
+    return `GitHub-API-Kontingent erschoepft.${until}`;
+  }
+
+  const status = (error as { status?: number } | null)?.status;
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (status === 403 || /not accessible by integration/i.test(message)) {
+    return (
+      `Keine Schreibrechte (HTTP 403): ${message}\n` +
+      "Dem Job fehlt fast sicher die Berechtigung. In der Workflow-Datei:\n" +
+      "\n    permissions:\n      contents: write\n\n" +
+      "Falls das schon dasteht: unter Settings > Actions > General muss " +
+      '"Workflow permissions" auf "Read and write" stehen, sonst wird der ' +
+      "Block still auf Lesen begrenzt."
+    );
+  }
+
+  if (status === 404) {
+    return (
+      `Nicht gefunden (HTTP 404): ${message}\n` +
+      "Entweder stimmt `repository` nicht, oder das Token darf das Repo nicht " +
+      "sehen. Bei einem privaten Repo braucht der Job `contents: read`."
+    );
+  }
+
+  return message;
+}
+
+/**
+ * Sammelt, leitet ab, rendert – und veroeffentlicht, sofern erlaubt.
+ *
+ * Die Outputs werden gesetzt, bevor irgendetwas geschrieben wird: schlaegt
+ * der Commit fehl, sollen `mood`, `satiety` und `health` trotzdem am Job
+ * haengen. Der Zustand ist zu dem Zeitpunkt bereits ermittelt, und ihn
+ * wegzuwerfen, weil ein Branch klemmt, waere Unsinn.
+ */
+export async function runAction(deps: ActionDeps): Promise<ActionResult> {
+  const { octokit, inputs, io } = deps;
+
+  const stats = await collectStats(
+    octokit,
+    inputs.source.owner,
+    inputs.source.repo,
+    deps.now ? { now: deps.now } : {},
+  );
+  const state = deriveState(stats);
+  const svg = renderPet(state);
+
+  io.info(
+    `${inputs.source.owner}/${inputs.source.repo}: ${state.mood} ` +
+      `(Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`,
+  );
+
+  io.setOutput("mood", state.mood);
+  io.setOutput("satiety", String(state.satiety));
+  io.setOutput("health", String(state.health));
+
+  let result: ActionResult;
+
+  if (inputs.dryRun) {
+    io.info("dry_run: nichts geschrieben.");
+    // Absichtlich leer statt der spaeteren URL: ein nachgelagerter Schritt,
+    // der `svg_url` einbettet, zeigte sonst auf eine Datei, die es nicht gibt.
+    io.setOutput("svg_url", "");
+    result = { stats, state, svg, svgUrl: "", outcome: "dry-run" };
+  } else {
+    const published = await publishSvg(octokit, {
+      owner: inputs.target.owner,
+      repo: inputs.target.repo,
+      branch: inputs.outputBranch,
+      path: inputs.outputFilename,
+      content: svg,
+      message:
+        `repo-pet: ${state.mood} (Saettigung ${state.satiety}, ` +
+        `Gesundheit ${state.health})`,
+    });
+
+    const svgUrl = svgRawUrl(inputs);
+    io.setOutput("svg_url", svgUrl);
+    io.info(
+      published.outcome === "unchanged"
+        ? "Unveraendert, kein Commit."
+        : `${published.outcome === "created" ? "Branch angelegt" : "Aktualisiert"}: ${published.commitSha}`,
+    );
+    result = { stats, state, svg, svgUrl, outcome: published.outcome };
+  }
+
+  await io.writeSummary(buildSummary(result, inputs));
+  return result;
+}

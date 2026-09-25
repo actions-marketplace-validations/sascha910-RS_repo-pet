@@ -1,0 +1,62 @@
+name: "repo-pet"
+description: >-
+  Rendert den Zustand eines Repos als Tamagotchi-Kreatur und legt das SVG in
+  einem eigenen Branch ab.
+
+branding:
+  icon: "heart"
+  color: "green"
+
+inputs:
+  github_token:
+    description: >-
+      Token fuer die API. Liest Commits, Issues und Workflow-Laeufe und
+      schreibt das SVG in den Output-Branch. Der Job braucht dafuer
+      `permissions: contents: write` - das haeufigste Problem beim Einrichten.
+      Ueblich ist `${{ github.token }}`.
+    required: true
+  output_branch:
+    description: >-
+      Branch, in dem das SVG landet. Bewusst nicht der Default-Branch: die
+      Datei aendert sich taeglich und wuerde sonst die Historie des Codes
+      zumuellen. Existiert der Branch nicht, wird er als Orphan angelegt und
+      enthaelt nur diese eine Datei.
+    required: false
+    default: "pet-output"
+  output_filename:
+    description: "Dateiname im Output-Branch."
+    required: false
+    default: "pet.svg"
+  repository:
+    description: >-
+      Repo, dessen Zustand gemessen wird, als `owner/repo`. Der Commit geht
+      immer in das Repo, in dem der Workflow laeuft - hiermit laesst sich also
+      ein fremdes Repo beobachten.
+    required: false
+    default: ${{ github.repository }}
+  dry_run:
+    description: >-
+      Sammelt und rendert, schreibt aber nichts. Fuer den ersten Lauf und zum
+      Pruefen der Berechtigungen, ohne einen Commit zu erzeugen.
+    required: false
+    default: "false"
+
+outputs:
+  mood:
+    description: "Stimmung der Kreatur: happy, content, sad oder sick."
+  satiety:
+    description: "Saettigung 0-100, aus der Commit-Aktivitaet."
+  health:
+    description: "Gesundheit 0-100, aus CI-Status und Issue-Hygiene."
+  svg_url:
+    description: >-
+      raw.githubusercontent.com-URL der abgelegten Datei, fertig zum Einbetten.
+      Bei `dry_run` leer, weil es nichts gibt, worauf sie zeigen koennte.
+
+runs:
+  # Node 20 wurde am 23.09.2026 aus den Runnern entfernt, inklusive des
+  # Opt-outs ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION. node24 ist die aktuell
+  # einzige sinnvolle Wahl - die Metadata-Referenz listet node20 zwar noch,
+  # ist an der Stelle aber veraltet.
+  using: "node24"
+  main: "dist/index.cjs"

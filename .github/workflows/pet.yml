@@ -1,0 +1,49 @@
+name: repo-pet
+
+on:
+  schedule:
+    # Nicht zur vollen Stunde: GitHub verteilt Cron-Laeufe, und auf den
+    # runden Zeiten stauen sie sich. Eine krumme Minute wird spuerbar
+    # puenktlicher ausgefuehrt.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Nur rendern, nichts committen"
+        type: boolean
+        default: false
+
+# Ohne das schlaegt der Commit mit "Resource not accessible by integration"
+# fehl - der haeufigste Fehler beim Einrichten.
+permissions:
+  contents: write
+
+# Zwei gleichzeitige Laeufe wuerden beide auf dieselbe Branch-Spitze
+# committen; der zweite scheiterte dann am updateRef, das bewusst ohne
+# force arbeitet.
+concurrency:
+  group: repo-pet
+  cancel-in-progress: false
+
+jobs:
+  pet:
+    runs-on: ubuntu-latest
+    steps:
+      # Noetig, weil `uses: ./` die Action aus dem Arbeitsverzeichnis laedt.
+      # Der Output-Branch wird nicht ausgecheckt - er wird ueber die
+      # Git-Data-API beschrieben.
+      - uses: actions/checkout@v7
+
+      - id: pet
+        uses: ./
+        with:
+          github_token: ${{ github.token }}
+          # Bei einem geplanten Lauf ist `inputs` leer, also false.
+          dry_run: ${{ inputs.dry_run || false }}
+
+      - name: Zustand ausgeben
+        run: |
+          echo "Stimmung  : ${{ steps.pet.outputs.mood }}"
+          echo "Saettigung: ${{ steps.pet.outputs.satiety }}"
+          echo "Gesundheit: ${{ steps.pet.outputs.health }}"
+          echo "SVG       : ${{ steps.pet.outputs.svg_url }}"

@@ -5,15 +5,18 @@
   "description": "GitHub Action, die den Zustand eines Repos als Tamagotchi-Kreatur rendert",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run --silent compile && npm run --silent bundle",
+    "build:check": "npm run --silent build && node build/scripts/check-generated.js dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "bundle": "esbuild build/src/entry.js --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.cjs --legal-comments=none",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo": "npm run --silent build && node build/scripts/demo.js",
-    "preview": "npm run --silent build && node build/scripts/preview.js"
+    "demo": "npm run --silent compile && node build/scripts/demo.js",
+    "preview": "npm run --silent compile && node build/scripts/preview.js"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
