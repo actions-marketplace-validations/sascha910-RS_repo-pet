@@ -67,6 +67,16 @@ export function fakeOctokit(routes: Record<string, Route> = {}): FakeOctokit {
 
   const octokit = {
     rest,
+    /**
+     * GraphQL laeuft ueber dieselbe Routentabelle, unter dem Namen
+     * "graphql" - der Sammler fuer Personen benutzt nur diesen einen Weg.
+     */
+    async graphql(query: string, params: Record<string, unknown>) {
+      calls.push({ route: "graphql", params });
+      const handler = table["graphql"];
+      if (!handler) throw new Error("Unerwarteter API-Aufruf: graphql");
+      return handler({ ...params, query });
+    },
     paginate: {
       async *iterator(endpoint: { route: string }, params: Record<string, unknown>) {
         calls.push({ route: `paginate:${endpoint.route}`, params });

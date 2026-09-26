@@ -58,6 +58,7 @@ Danach einmal von Hand unter *Actions* starten, dann ins README:
 | `output_branch` | `pet-output` | Branch für das SVG. Existiert er nicht, wird er als Orphan angelegt. |
 | `output_filename` | `pet.svg` | Pfad im Branch. Unterordner sind erlaubt. |
 | `repository` | aktuelles Repo | Gemessen wird dieses Repo, committet wird immer ins eigene. |
+| `user` | — | Misst eine Person statt eines Repos: ihre Commit-Aktivität und den Zustand ihrer Repos. Hat Vorrang vor `repository`. |
 | `dry_run` | `false` | Rendert und zeigt das Ergebnis in der Job Summary, schreibt nichts. |
 
 ## Outputs
@@ -117,6 +118,17 @@ write" stehen.
 
 **Kann ich ein fremdes Repo beobachten?**
 Ja, über `repository`. Das SVG landet trotzdem in deinem Repo.
+
+**Kann das Pet meine gesamte Aktivität zeigen statt eines Repos?**
+Ja, über `user`. Sättigung kommt dann aus deinen Commits über alle Projekte,
+Gesundheit aus dem Querschnitt: Anteil grüner CI-Läufe über deine zuletzt
+bearbeiteten Repos, dazu offene gegen kürzlich geschlossene Issues. Ein
+einzelnes rotes Nebenprojekt macht das Pet nicht krank — erst die Mehrheit.
+
+**Zählen dabei auch meine privaten Repos?**
+Mit `github.token` nicht, der sieht nur öffentliche Beiträge. Für private
+brauchst du einen PAT mit `read:user` und die Profileinstellung „Include
+private contributions on my profile".
 
 **Warum ist die Animation reines CSS?**
 `raw.githubusercontent.com` liefert SVGs mit

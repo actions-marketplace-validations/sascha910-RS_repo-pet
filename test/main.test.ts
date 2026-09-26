@@ -11,7 +11,7 @@ import { fakeOctokit, httpError } from "./helpers/octokit.js";
 
 const INPUTS: ActionInputs = {
   githubToken: "ghs_token",
-  source: { owner: "fremd", repo: "projekt" },
+  subject: { kind: "repo", repo: { owner: "fremd", repo: "projekt" } } as const,
   target: { owner: "ich", repo: "meins" },
   outputBranch: "pet-output",
   outputFilename: "pet.svg",
@@ -85,6 +85,37 @@ describe("runAction – dry_run schreibt nichts", () => {
     expect(summary[0]).toContain("dry_run");
     expect(summary[0]).toContain("fremd/projekt");
     expect(logs.some((line) => line.includes("dry_run"))).toBe(true);
+  });
+});
+
+describe("runAction – Person statt Repo", () => {
+  it("misst ueber GraphQL, ohne einen einzigen REST-Endpunkt zu beruehren", async () => {
+    const { octokit, routes } = fakeOctokit({
+      graphql: () => ({
+        user: {
+          commits: { totalCommitContributions: 9, restrictedContributionsCount: 0 },
+          activity: {
+            contributionCalendar: {
+              weeks: [{ contributionDays: [{ date: "2026-09-25", contributionCount: 4 }] }],
+            },
+          },
+          repositories: { nodes: [] },
+        },
+        open: { issueCount: 0 },
+        closed: { issueCount: 0 },
+      }),
+    });
+    const { io, logs } = recordingIo();
+
+    await runAction({
+      octokit,
+      inputs: { ...INPUTS, subject: { kind: "user", login: "octocat" } },
+      io,
+      now: NOW,
+    });
+
+    expect(routes()).toEqual(["graphql"]);
+    expect(logs[0]).toContain("@octocat");
   });
 });
 

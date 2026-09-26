@@ -19,7 +19,7 @@ export type Octokit = InstanceType<typeof GitHub>;
 export const COMMIT_WINDOW_DAYS = 7;
 
 /** Fenster fuer `closedIssuesLast30Days`. */
-const CLOSED_ISSUE_WINDOW_DAYS = 30;
+export const CLOSED_ISSUE_WINDOW_DAYS = 30;
 
 /**
  * Obergrenze an Seiten pro paginiertem Aufruf (100 Eintraege je Seite).
@@ -141,7 +141,7 @@ function isoDaysAgo(now: Date, days: number): string {
 }
 
 /** Volle Tage zwischen zwei Zeitpunkten, nie negativ. */
-function fullDaysBetween(from: Date, to: Date): number {
+export function fullDaysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)));
 }
 

@@ -14,8 +14,9 @@
 import { publishSvg, type PublishOutcome } from "./publish.js";
 import { renderPet } from "./render.js";
 import { collectStats, RateLimitError, type Octokit } from "./stats.js";
+import { collectUserStats } from "./user-stats.js";
 import { deriveState } from "./state.js";
-import { InputError, type ActionInputs } from "./inputs.js";
+import { describeSubject, InputError, type ActionInputs } from "./inputs.js";
 import type { PetState, RepoStats } from "./types.js";
 
 /**
@@ -104,7 +105,7 @@ export function buildSummary(result: ActionResult, inputs: ActionInputs): string
     `| Stimmung | \`${state.mood}\` |`,
     `| Saettigung | ${state.satiety} / 100 |`,
     `| Gesundheit | ${state.health} / 100 |`,
-    `| Gemessen an | \`${inputs.source.owner}/${inputs.source.repo}\` |`,
+    `| Gemessen an | \`${describeSubject(inputs.subject)}\` |`,
     "",
     "<details><summary>Rohdaten</summary>",
     "",
@@ -196,17 +197,18 @@ export function describeFailure(error: unknown): string {
 export async function runAction(deps: ActionDeps): Promise<ActionResult> {
   const { octokit, inputs, io } = deps;
 
-  const stats = await collectStats(
-    octokit,
-    inputs.source.owner,
-    inputs.source.repo,
-    deps.now ? { now: deps.now } : {},
-  );
+  const zeit = deps.now ? { now: deps.now } : {};
+  // Zwei Sammler, eine Struktur: beide liefern `RepoStats`, damit alles
+  // dahinter – Ableitung, Renderer, Tests – den Unterschied nicht kennt.
+  const stats =
+    inputs.subject.kind === "user"
+      ? await collectUserStats(octokit, inputs.subject.login, zeit)
+      : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, zeit);
   const state = deriveState(stats);
   const svg = renderPet(state);
 
   io.info(
-    `${inputs.source.owner}/${inputs.source.repo}: ${state.mood} ` +
+    `${describeSubject(inputs.subject)}: ${state.mood} ` +
       `(Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`,
   );
 

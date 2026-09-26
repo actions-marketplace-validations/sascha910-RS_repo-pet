@@ -38,6 +38,10 @@ jobs:
         uses: ./
         with:
           github_token: ${{ github.token }}
+          # Gemessen wird die Person, nicht dieses eine Repo: Commits ueber
+          # alle Projekte und der CI-Querschnitt darueber. Ohne diese Zeile
+          # waere es wieder nur repo-pet selbst.
+          user: sascha910-RS
           # Bei einem geplanten Lauf ist `inputs` leer, also false.
           dry_run: ${{ inputs.dry_run || false }}
 

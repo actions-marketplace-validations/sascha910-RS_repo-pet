@@ -45,6 +45,16 @@ inputs:
       else's repository while the image lands in your own.
     required: false
     default: ${{ github.repository }}
+  user:
+    description: >-
+      Measure a person instead of a repository: their commit activity and the
+      state of their repositories, the way a GitHub profile shows it. Takes
+      precedence over `repository` when set. Note that a workflow's
+      `github.token` only sees public activity - counting private
+      contributions needs a personal access token with `read:user` scope and
+      the "Include private contributions on my profile" setting.
+    required: false
+    default: ""
   dry_run:
     description: >-
       Collect and render, but write nothing. For a first run and for checking

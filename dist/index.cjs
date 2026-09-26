@@ -23886,6 +23886,10 @@ var core = __toESM(require_core(), 1);
 var import_github = __toESM(require_github(), 1);
 
 // build/src/inputs.js
+function describeSubject(subject) {
+  return subject.kind === "repo" ? `${subject.repo.owner}/${subject.repo.repo}` : `@${subject.login}`;
+}
+var LOGIN_PATTERN = /^[A-Za-z\d](?:[A-Za-z\d]|-(?=[A-Za-z\d])){0,38}$/;
 var InputError = class extends Error {
   constructor(message) {
     super(message);
@@ -23932,9 +23936,14 @@ function readInputs(source) {
   const outputBranch = source.getInput("output_branch").trim();
   if (outputBranch === "")
     throw new InputError("output_branch ist leer.");
+  const login = source.getInput("user").trim();
+  if (login !== "" && !LOGIN_PATTERN.test(login)) {
+    throw new InputError(`user: "${login}" ist kein GitHub-Benutzername.`);
+  }
+  const subject = login !== "" ? { kind: "user", login } : { kind: "repo", repo: parseRepoRef(sourceValue, "repository") };
   return {
     githubToken,
-    source: parseRepoRef(sourceValue, "repository"),
+    subject,
     target: parseRepoRef(targetValue, "GITHUB_REPOSITORY"),
     outputBranch,
     outputFilename: checkFilename(source.getInput("output_filename")),
@@ -24756,6 +24765,81 @@ async function collectStats(octokit, owner, repo, options = {}) {
   };
 }
 
+// build/src/user-stats.js
+var USER_REPO_SAMPLE = 10;
+var USER_ACTIVITY_WINDOW_DAYS = 90;
+var USER_CI_FAILURE_SHARE = 0.5;
+var QUERY = `
+query($login:String!, $from7:DateTime!, $fromWindow:DateTime!, $sample:Int!, $openQ:String!, $closedQ:String!) {
+  user(login:$login) {
+    commits: contributionsCollection(from:$from7) {
+      totalCommitContributions
+      restrictedContributionsCount
+    }
+    activity: contributionsCollection(from:$fromWindow) {
+      contributionCalendar { weeks { contributionDays { date contributionCount } } }
+    }
+    repositories(first:$sample, orderBy:{field:PUSHED_AT,direction:DESC}, ownerAffiliations:OWNER, isFork:false) {
+      nodes {
+        nameWithOwner
+        defaultBranchRef { target { ... on Commit { statusCheckRollup { state } } } }
+      }
+    }
+  }
+  open: search(query:$openQ, type:ISSUE) { issueCount }
+  closed: search(query:$closedQ, type:ISSUE) { issueCount }
+}`;
+function ciCrossSection(states) {
+  const bekannt = states.filter((state) => state === "SUCCESS" || state === "FAILURE" || state === "ERROR");
+  if (bekannt.length === 0)
+    return null;
+  const rot = bekannt.filter((state) => state !== "SUCCESS").length;
+  if (rot === 0)
+    return "success";
+  if (rot / bekannt.length > USER_CI_FAILURE_SHARE)
+    return "failure";
+  return null;
+}
+function daysSinceLastActivity(days, now) {
+  const aktiv = days.filter((tag) => tag.contributionCount > 0).map((tag) => tag.date);
+  if (aktiv.length === 0)
+    return NO_COMMITS_DAYS;
+  const letzter = aktiv.reduce((a, b) => a > b ? a : b);
+  return fullDaysBetween(/* @__PURE__ */ new Date(`${letzter}T00:00:00Z`), now);
+}
+function isoAgo(now, days) {
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1e3).toISOString();
+}
+async function collectUserStats(octokit, login, options = {}) {
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const closedSince = isoAgo(now, CLOSED_ISSUE_WINDOW_DAYS).slice(0, 10);
+  const antwort = await octokit.graphql(QUERY, {
+    login,
+    from7: isoAgo(now, COMMIT_WINDOW_DAYS),
+    fromWindow: isoAgo(now, USER_ACTIVITY_WINDOW_DAYS),
+    sample: USER_REPO_SAMPLE,
+    // `user:` schraenkt die Suche auf Repos dieser Person ein - damit zaehlen
+    // auch Issues mit, die andere dort aufgemacht haben. Genau darum geht es:
+    // gemessen wird der Zustand der eigenen Projekte, nicht die eigene
+    // Schreibleistung.
+    openQ: `user:${login} is:issue is:open archived:false`,
+    closedQ: `user:${login} is:issue is:closed closed:>=${closedSince} archived:false`
+  });
+  const user = antwort.user;
+  if (!user) {
+    throw new Error(`Benutzer "${login}" nicht gefunden oder fuer dieses Token nicht sichtbar.`);
+  }
+  const tage = user.activity.contributionCalendar.weeks.flatMap((woche) => woche.contributionDays);
+  const zustaende = user.repositories.nodes.map((repo) => repo.defaultBranchRef?.target?.statusCheckRollup?.state);
+  return {
+    commitsLast7Days: user.commits.totalCommitContributions,
+    daysSinceLastCommit: daysSinceLastActivity(tage, now),
+    openIssues: antwort.open.issueCount,
+    closedIssuesLast30Days: antwort.closed.issueCount,
+    lastWorkflowConclusion: ciCrossSection(zustaende)
+  };
+}
+
 // build/src/main.js
 function svgRawUrl(inputs) {
   const { owner, repo } = inputs.target;
@@ -24767,7 +24851,7 @@ function buildSummary(result, inputs) {
   if (result.svgUrl !== "") {
     lines.push(`<img src="${result.svgUrl}" alt="repo-pet: ${state.mood}" width="112" height="120">`, "");
   }
-  lines.push("| | |", "| --- | --- |", `| Stimmung | \`${state.mood}\` |`, `| Saettigung | ${state.satiety} / 100 |`, `| Gesundheit | ${state.health} / 100 |`, `| Gemessen an | \`${inputs.source.owner}/${inputs.source.repo}\` |`, "", "<details><summary>Rohdaten</summary>", "", "```json", JSON.stringify(stats, null, 2), "```", "", "</details>");
+  lines.push("| | |", "| --- | --- |", `| Stimmung | \`${state.mood}\` |`, `| Saettigung | ${state.satiety} / 100 |`, `| Gesundheit | ${state.health} / 100 |`, `| Gemessen an | \`${describeSubject(inputs.subject)}\` |`, "", "<details><summary>Rohdaten</summary>", "", "```json", JSON.stringify(stats, null, 2), "```", "", "</details>");
   const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
   if (result.outcome === "created") {
     lines.push("", `Branch \`${inputs.outputBranch}\` angelegt, SVG liegt unter ${ort}.`);
@@ -24806,10 +24890,11 @@ Entweder stimmt \`repository\` nicht, oder das Token darf das Repo nicht sehen. 
 }
 async function runAction(deps) {
   const { octokit, inputs, io: io2 } = deps;
-  const stats = await collectStats(octokit, inputs.source.owner, inputs.source.repo, deps.now ? { now: deps.now } : {});
+  const zeit = deps.now ? { now: deps.now } : {};
+  const stats = inputs.subject.kind === "user" ? await collectUserStats(octokit, inputs.subject.login, zeit) : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, zeit);
   const state = deriveState(stats);
   const svg = renderPet(state);
-  io2.info(`${inputs.source.owner}/${inputs.source.repo}: ${state.mood} (Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`);
+  io2.info(`${describeSubject(inputs.subject)}: ${state.mood} (Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`);
   io2.setOutput("mood", state.mood);
   io2.setOutput("satiety", String(state.satiety));
   io2.setOutput("health", String(state.health));

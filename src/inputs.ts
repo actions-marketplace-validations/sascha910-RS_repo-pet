@@ -16,10 +16,26 @@ export interface RepoRef {
   readonly repo: string;
 }
 
+/**
+ * Woran gemessen wird: an einem Repo oder an einer Person.
+ *
+ * Als unterschiedene Union und nicht als zwei optionale Felder – so kann der
+ * Ablauf in `main.ts` nicht versehentlich beides oder keines behandeln, und
+ * der Typecheck erzwingt, dass jeder neue Fall ueberall mitgezogen wird.
+ */
+export type Subject =
+  | { readonly kind: "repo"; readonly repo: RepoRef }
+  | { readonly kind: "user"; readonly login: string };
+
+/** Menschenlesbar, fuer Log und Zusammenfassung. */
+export function describeSubject(subject: Subject): string {
+  return subject.kind === "repo" ? `${subject.repo.owner}/${subject.repo.repo}` : `@${subject.login}`;
+}
+
 export interface ActionInputs {
   readonly githubToken: string;
-  /** Repo, dessen Zustand gemessen wird (Input `repository`). */
-  readonly source: RepoRef;
+  /** Was gemessen wird – Input `repository` oder `user`. */
+  readonly subject: Subject;
   /**
    * Repo, in das committet wird – immer das, in dem der Workflow laeuft.
    *
@@ -45,6 +61,14 @@ export interface InputSource {
   /** Prozessumgebung – fuer den Fallback auf `GITHUB_REPOSITORY`. */
   readonly env: Readonly<Record<string, string | undefined>>;
 }
+
+/**
+ * GitHub-Benutzernamen: Buchstaben, Ziffern und einzelne Bindestriche,
+ * hoechstens 39 Zeichen. Streng geprueft, weil ein Tippfehler sonst als
+ * "nicht gefunden" aus der API zurueckkommt und wie ein Rechteproblem
+ * aussieht.
+ */
+const LOGIN_PATTERN = /^[A-Za-z\d](?:[A-Za-z\d]|-(?=[A-Za-z\d])){0,38}$/;
 
 /** Fehler in der Workflow-Konfiguration, nicht in der Action. */
 export class InputError extends Error {
@@ -125,9 +149,22 @@ export function readInputs(source: InputSource): ActionInputs {
   const outputBranch = source.getInput("output_branch").trim();
   if (outputBranch === "") throw new InputError("output_branch ist leer.");
 
+  // `user` schlaegt `repository`. Ein Fehler bei beiden waere hier nicht
+  // umsetzbar: `repository` hat in action.yml den Default
+  // `${{ github.repository }}` und ist im Workflow damit immer gesetzt -
+  // "ausdruecklich angegeben" laesst sich von "Default" nicht unterscheiden.
+  const login = source.getInput("user").trim();
+  if (login !== "" && !LOGIN_PATTERN.test(login)) {
+    throw new InputError(`user: "${login}" ist kein GitHub-Benutzername.`);
+  }
+  const subject: Subject =
+    login !== ""
+      ? { kind: "user", login }
+      : { kind: "repo", repo: parseRepoRef(sourceValue, "repository") };
+
   return {
     githubToken,
-    source: parseRepoRef(sourceValue, "repository"),
+    subject,
     target: parseRepoRef(targetValue, "GITHUB_REPOSITORY"),
     outputBranch,
     outputFilename: checkFilename(source.getInput("output_filename")),

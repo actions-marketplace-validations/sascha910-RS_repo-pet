@@ -58,6 +58,7 @@ Run it once by hand under *Actions*, then put this in your README:
 | `output_branch` | `pet-output` | Branch the SVG lives in. Created as an orphan if it does not exist. |
 | `output_filename` | `pet.svg` | Path inside that branch. Subdirectories are allowed. |
 | `repository` | current repo | The repo being measured. The commit always goes to your own repo. |
+| `user` | — | Measure a person instead of a repo: their commit activity and the state of their repos. Takes precedence over `repository`. |
 | `dry_run` | `false` | Renders and shows the result in the job summary, writes nothing. |
 
 ## Outputs
@@ -116,6 +117,17 @@ The job is missing `permissions: contents: write`. If that is already there,
 
 **Can I watch someone else's repository?**
 Yes, via `repository`. The SVG still lands in your own repo.
+
+**Can the pet reflect all of my activity instead of one repo?**
+Yes, via `user`. Satiety then comes from your commits across all projects,
+and health from a cross-section: the share of green CI runs across your most
+recently pushed repos, plus open versus recently closed issues. A single red
+side project will not make the pet ill — only a majority will.
+
+**Does that include my private repositories?**
+Not with `github.token`, which only sees public activity. For private
+contributions you need a PAT with `read:user` scope and the "Include private
+contributions on my profile" setting.
 
 **Why is the animation pure CSS?**
 `raw.githubusercontent.com` serves SVGs with
