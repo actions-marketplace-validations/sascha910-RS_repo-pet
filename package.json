@@ -1,6 +1,6 @@
 {
   "name": "repo-pet",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "GitHub Action, die den Zustand eines Repos als Tamagotchi-Kreatur rendert",
   "type": "module",
