@@ -248,10 +248,19 @@ describe("buildSummary", () => {
 
 describe("action.yml passt zum Code", () => {
   const action = parseYaml(readFileSync("action.yml", "utf8")) as {
+    description: string;
     inputs: Record<string, { default?: string }>;
     outputs: Record<string, unknown>;
     runs: { using: string; main: string };
   };
+
+  it("die Beschreibung passt in den Marketplace", () => {
+    // Das Formular akzeptiert unter 125 Zeichen und sagt es einem erst im
+    // letzten Schritt des Veroeffentlichens. Hier faellt es sofort auf.
+    const laenge = action.description.trim().length;
+    expect(laenge).toBeLessThan(125);
+    expect(laenge).toBeGreaterThan(0);
+  });
 
   it("laeuft auf node24", () => {
     // Node 20 wurde am 23.09.2026 aus den Runnern entfernt, samt Opt-out.

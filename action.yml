@@ -1,7 +1,9 @@
 name: "repo-pet"
+# Under 125 characters: that is what the Marketplace form accepts. A test
+# enforces it, because the form rejects it only at the very last step.
 description: >-
-  Turns a repository's commit activity, CI status and issue hygiene into an
-  animated pixel pet, committed as an SVG to a branch of its own.
+  Renders a repo or your GitHub activity as an animated pixel pet, committed
+  daily as an SVG.
 
 branding:
   icon: "heart"
