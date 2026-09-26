@@ -11,6 +11,9 @@
  *   wochenlang eine aeltere Version.
  * - `docs/gallery/*.svg` steht im README. Aendert sich das Sprite, zeigt die
  *   Galerie weiter die alte Kreatur.
+ * - `docs/social-preview.png` ist die Kachel, die beim Teilen des Repos
+ *   erscheint. Sie wird von Hand in die Einstellungen geladen und faellt
+ *   danach niemandem mehr auf.
  *
  * Deshalb ist das ein Fehler, keine Warnung.
  */
@@ -35,8 +38,9 @@ if (status === "") {
 console.error("Diese erzeugten Dateien passen nicht zum Quelltext:\n");
 console.error(status);
 console.error(
-  "\nBitte `npm run build` und `npm run gallery` laufen lassen und das\n" +
-    "Ergebnis mitcommitten. Beides wird eingecheckt, weil GitHub das Bundle\n" +
-    "direkt ausfuehrt und das README die Galerie direkt einbindet.",
+  "\nBitte `npm run build:check` laufen lassen - es erzeugt Bundle, Galerie\n" +
+    "und Preview-Kachel neu - und das Ergebnis mitcommitten. Alle drei werden\n" +
+    "eingecheckt, weil GitHub das Bundle direkt ausfuehrt, das README die\n" +
+    "Galerie einbindet und die Kachel von Hand hochgeladen wird.",
 );
 process.exit(1);

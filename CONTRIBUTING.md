@@ -35,8 +35,10 @@ Der Ablauf:
 2. `npm run preview` und hinsehen.
 3. `npm test`. Ändert sich ein Snapshot, hat sich das Bild geändert – das ist
    der Zweck. Erst die Vorschau beurteilen, dann `npx vitest run -u`.
-4. Hat sich das Aussehen geändert: `npm run gallery`, damit die Bilder im
-   README nachziehen.
+4. Hat sich das Aussehen geändert: `npm run gallery` und `npm run social`,
+   damit die Bilder im README und die Social-Preview-Kachel nachziehen.
+   `build:check` erledigt beides mit, prüft aber zusätzlich, ob du es auch
+   committet hast.
 
 ### Die eine Regel, die beim ersten Versuch zubeißt
 
@@ -71,10 +73,12 @@ npm test
 npm run build:check
 ```
 
-`build:check` schlägt fehl, wenn `dist/` oder `docs/gallery/` nicht zum
-Quelltext passen. Beides wird eingecheckt: GitHub führt bei einer
-JavaScript-Action `dist/index.cjs` direkt aus, und das README bindet die
-Galerie direkt ein. Veraltet eines davon, merkt es niemand.
+`build:check` schlägt fehl, wenn `dist/`, `docs/gallery/` oder
+`docs/social-preview.png` nicht zum Quelltext passen. Alle drei werden
+eingecheckt: GitHub führt bei einer JavaScript-Action `dist/index.cjs` direkt
+aus, das README bindet die Galerie direkt ein, und die Preview-Kachel lädt man
+von Hand in die Repo-Einstellungen hoch. Veraltet eines davon, merkt es
+niemand.
 
 ## Die Action lokal durchspielen
 
