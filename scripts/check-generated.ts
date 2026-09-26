@@ -11,9 +11,14 @@
  *   wochenlang eine aeltere Version.
  * - `docs/gallery/*.svg` steht im README. Aendert sich das Sprite, zeigt die
  *   Galerie weiter die alte Kreatur.
- * - `docs/social-preview.png` ist die Kachel, die beim Teilen des Repos
- *   erscheint. Sie wird von Hand in die Einstellungen geladen und faellt
- *   danach niemandem mehr auf.
+ * `docs/social-preview.png` steht bewusst **nicht** auf der Liste, obwohl es
+ * ebenfalls erzeugt und eingecheckt wird. Die Pixel sind reproduzierbar, die
+ * Datei ist es nicht: die Deflate-Ausgabe haengt von der zlib-Version ab, die
+ * in der jeweiligen Node-Version steckt. Ein Byte-Vergleich meldete dann bei
+ * jedem Versionsunterschied eine Abweichung, die keine ist - und liesse
+ * nebenbei bei jedem Lauf eine geaenderte Datei im Arbeitsverzeichnis liegen.
+ * Die Kachel wird ohnehin von Hand hochgeladen; ein veralteter Stand im Repo
+ * bricht nichts.
  *
  * Deshalb ist das ein Fehler, keine Warnung.
  */
@@ -38,9 +43,9 @@ if (status === "") {
 console.error("Diese erzeugten Dateien passen nicht zum Quelltext:\n");
 console.error(status);
 console.error(
-  "\nBitte `npm run build:check` laufen lassen - es erzeugt Bundle, Galerie\n" +
-    "und Preview-Kachel neu - und das Ergebnis mitcommitten. Alle drei werden\n" +
-    "eingecheckt, weil GitHub das Bundle direkt ausfuehrt, das README die\n" +
-    "Galerie einbindet und die Kachel von Hand hochgeladen wird.",
+  "\nBitte `npm run build:check` laufen lassen - es erzeugt Bundle und\n" +
+    "Galerie neu - und das Ergebnis mitcommitten. Beides wird eingecheckt,\n" +
+    "weil GitHub das Bundle direkt ausfuehrt und das README die Galerie\n" +
+    "direkt einbindet.",
 );
 process.exit(1);

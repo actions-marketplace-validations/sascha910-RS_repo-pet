@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "npm run --silent compile && npm run --silent bundle",
-    "build:check": "npm run --silent build && npm run --silent gallery && npm run --silent social && node build/scripts/check-generated.js dist docs/gallery docs/social-preview.png",
+    "build:check": "npm run --silent build && npm run --silent gallery && node build/scripts/check-generated.js dist docs/gallery",
     "compile": "tsc -p tsconfig.build.json",
     "bundle": "esbuild build/src/entry.js --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.cjs --legal-comments=none",
     "typecheck": "tsc -p tsconfig.json --noEmit",
