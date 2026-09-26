@@ -137,7 +137,7 @@ describe("collectUserStats", () => {
   it("ein unbekannter Benutzer ist ein klarer Fehler", async () => {
     const { octokit } = fakeOctokit({ graphql: () => ({ user: null, open: { issueCount: 0 }, closed: { issueCount: 0 } }) });
     await expect(collectUserStats(octokit, "gibtsnicht", { now: NOW })).rejects.toThrow(
-      /nicht gefunden/,
+      /not found/,
     );
   });
 });

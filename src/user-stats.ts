@@ -112,12 +112,12 @@ query($login:String!, $from7:DateTime!, $fromWindow:DateTime!, $sample:Int!, $op
  * Repos ohne Rollup (kein CI eingerichtet) zaehlen gar nicht mit.
  */
 export function ciCrossSection(states: readonly (string | null | undefined)[]): WorkflowConclusion {
-  const bekannt = states.filter((state): state is string => state === "SUCCESS" || state === "FAILURE" || state === "ERROR");
-  if (bekannt.length === 0) return null;
+  const known = states.filter((state): state is string => state === "SUCCESS" || state === "FAILURE" || state === "ERROR");
+  if (known.length === 0) return null;
 
-  const rot = bekannt.filter((state) => state !== "SUCCESS").length;
-  if (rot === 0) return "success";
-  if (rot / bekannt.length > USER_CI_FAILURE_SHARE) return "failure";
+  const red = known.filter((state) => state !== "SUCCESS").length;
+  if (red === 0) return "success";
+  if (red / known.length > USER_CI_FAILURE_SHARE) return "failure";
   return null;
 }
 
@@ -132,11 +132,11 @@ export function ciCrossSection(states: readonly (string | null | undefined)[]): 
  * derselbe Sentinel wie im Repo-Sammler.
  */
 export function daysSinceLastActivity(days: readonly ContributionDay[], now: Date): number {
-  const aktiv = days.filter((tag) => tag.contributionCount > 0).map((tag) => tag.date);
-  if (aktiv.length === 0) return NO_COMMITS_DAYS;
+  const active = days.filter((day) => day.contributionCount > 0).map((day) => day.date);
+  if (active.length === 0) return NO_COMMITS_DAYS;
 
-  const letzter = aktiv.reduce((a, b) => (a > b ? a : b));
-  return fullDaysBetween(new Date(`${letzter}T00:00:00Z`), now);
+  const latest = active.reduce((a, b) => (a > b ? a : b));
+  return fullDaysBetween(new Date(`${latest}T00:00:00Z`), now);
 }
 
 export interface CollectUserOptions {
@@ -157,7 +157,7 @@ export async function collectUserStats(
   const now = options.now ?? new Date();
   const closedSince = isoAgo(now, CLOSED_ISSUE_WINDOW_DAYS).slice(0, 10);
 
-  const antwort = await octokit.graphql<UserStatsResponse>(QUERY, {
+  const response = await octokit.graphql<UserStatsResponse>(QUERY, {
     login,
     from7: isoAgo(now, COMMIT_WINDOW_DAYS),
     fromWindow: isoAgo(now, USER_ACTIVITY_WINDOW_DAYS),
@@ -170,21 +170,21 @@ export async function collectUserStats(
     closedQ: `user:${login} is:issue is:closed closed:>=${closedSince} archived:false`,
   });
 
-  const user = antwort.user;
+  const user = response.user;
   if (!user) {
-    throw new Error(`Benutzer "${login}" nicht gefunden oder fuer dieses Token nicht sichtbar.`);
+    throw new Error(`User "${login}" not found, or not visible to this token.`);
   }
 
-  const tage = user.activity.contributionCalendar.weeks.flatMap((woche) => woche.contributionDays);
-  const zustaende = user.repositories.nodes.map(
+  const days = user.activity.contributionCalendar.weeks.flatMap((week) => week.contributionDays);
+  const ciStates = user.repositories.nodes.map(
     (repo) => repo.defaultBranchRef?.target?.statusCheckRollup?.state,
   );
 
   return {
     commitsLast7Days: user.commits.totalCommitContributions,
-    daysSinceLastCommit: daysSinceLastActivity(tage, now),
-    openIssues: antwort.open.issueCount,
-    closedIssuesLast30Days: antwort.closed.issueCount,
-    lastWorkflowConclusion: ciCrossSection(zustaende),
+    daysSinceLastCommit: daysSinceLastActivity(days, now),
+    openIssues: response.open.issueCount,
+    closedIssuesLast30Days: response.closed.issueCount,
+    lastWorkflowConclusion: ciCrossSection(ciStates),
   };
 }

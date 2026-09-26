@@ -23899,7 +23899,7 @@ var InputError = class extends Error {
 function parseRepoRef(value, label) {
   const match = /^([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(value.trim());
   if (!match?.[1] || !match[2]) {
-    throw new InputError(`${label}: "${value}" ist kein owner/repo.`);
+    throw new InputError(`${label}: "${value}" is not in owner/repo form.`);
   }
   return { owner: match[1], repo: match[2] };
 }
@@ -23909,36 +23909,36 @@ function parseBoolean(value, label) {
     return false;
   if (normalized === "true")
     return true;
-  throw new InputError(`${label}: "${value}" ist weder "true" noch "false".`);
+  throw new InputError(`${label}: "${value}" is neither "true" nor "false".`);
 }
 function checkFilename(value) {
   const name = value.trim();
   if (name === "")
-    throw new InputError("output_filename ist leer.");
+    throw new InputError("output_filename is empty.");
   if (name.startsWith("/"))
-    throw new InputError(`output_filename: "${name}" darf nicht mit / beginnen.`);
+    throw new InputError(`output_filename: "${name}" must not start with a slash.`);
   if (name.split("/").includes(".."))
-    throw new InputError(`output_filename: "${name}" darf kein ".." enthalten.`);
+    throw new InputError(`output_filename: "${name}" must not contain "..".`);
   return name;
 }
 function readInputs(source) {
   const githubToken = source.getInput("github_token").trim();
   if (githubToken === "") {
-    throw new InputError("github_token fehlt. Ueblich ist `github_token: ${{ github.token }}` im with-Block der Action.");
+    throw new InputError("github_token is missing. The usual value is the github.token expression, passed in the action's with block.");
   }
   const repositoryInput = source.getInput("repository").trim();
   const contextRepository = (source.env["GITHUB_REPOSITORY"] ?? "").trim();
   const sourceValue = repositoryInput !== "" ? repositoryInput : contextRepository;
   if (sourceValue === "") {
-    throw new InputError("repository ist leer und GITHUB_REPOSITORY nicht gesetzt.");
+    throw new InputError("repository is empty and GITHUB_REPOSITORY is not set.");
   }
   const targetValue = contextRepository !== "" ? contextRepository : sourceValue;
   const outputBranch = source.getInput("output_branch").trim();
   if (outputBranch === "")
-    throw new InputError("output_branch ist leer.");
+    throw new InputError("output_branch is empty.");
   const login = source.getInput("user").trim();
   if (login !== "" && !LOGIN_PATTERN.test(login)) {
-    throw new InputError(`user: "${login}" ist kein GitHub-Benutzername.`);
+    throw new InputError(`user: "${login}" is not a GitHub username.`);
   }
   const subject = login !== "" ? { kind: "user", login } : { kind: "repo", repo: parseRepoRef(sourceValue, "repository") };
   return {
@@ -23986,7 +23986,7 @@ async function existingBlobSha(octokit, request) {
     return null;
   const data = response.data;
   if (Array.isArray(data)) {
-    throw new Error(`output_filename "${request.path}" ist im Branch "${request.branch}" ein Verzeichnis.`);
+    throw new Error(`output_filename "${request.path}" is a directory in branch "${request.branch}".`);
   }
   const file = data;
   return file.type === "file" && file.sha ? file.sha : null;
@@ -24574,7 +24574,7 @@ function renderSprite(sprite, state) {
   });
   const style = sprite.frames.length > 1 ? animationStyle(sprite) : "";
   const body = sprite.frames.length > 1 ? frames.join("") : frames[0]?.replace(/ class="[^"]*"/, "") ?? "";
-  const label = `Repo-Pet: ${state.mood}, Saettigung ${state.satiety}, Gesundheit ${state.health}`;
+  const label = `repo-pet: ${state.mood}, satiety ${state.satiety}, health ${state.health}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}" width="${CANVAS_WIDTH * 4}" height="${CANVAS_HEIGHT * 4}" shape-rendering="crispEdges" role="img" aria-label="${label}">` + style + body + statusBars(state) + "</svg>";
 }
 function renderPet(state) {
@@ -24790,22 +24790,22 @@ query($login:String!, $from7:DateTime!, $fromWindow:DateTime!, $sample:Int!, $op
   closed: search(query:$closedQ, type:ISSUE) { issueCount }
 }`;
 function ciCrossSection(states) {
-  const bekannt = states.filter((state) => state === "SUCCESS" || state === "FAILURE" || state === "ERROR");
-  if (bekannt.length === 0)
+  const known = states.filter((state) => state === "SUCCESS" || state === "FAILURE" || state === "ERROR");
+  if (known.length === 0)
     return null;
-  const rot = bekannt.filter((state) => state !== "SUCCESS").length;
-  if (rot === 0)
+  const red = known.filter((state) => state !== "SUCCESS").length;
+  if (red === 0)
     return "success";
-  if (rot / bekannt.length > USER_CI_FAILURE_SHARE)
+  if (red / known.length > USER_CI_FAILURE_SHARE)
     return "failure";
   return null;
 }
 function daysSinceLastActivity(days, now) {
-  const aktiv = days.filter((tag) => tag.contributionCount > 0).map((tag) => tag.date);
-  if (aktiv.length === 0)
+  const active = days.filter((day) => day.contributionCount > 0).map((day) => day.date);
+  if (active.length === 0)
     return NO_COMMITS_DAYS;
-  const letzter = aktiv.reduce((a, b) => a > b ? a : b);
-  return fullDaysBetween(/* @__PURE__ */ new Date(`${letzter}T00:00:00Z`), now);
+  const latest = active.reduce((a, b) => a > b ? a : b);
+  return fullDaysBetween(/* @__PURE__ */ new Date(`${latest}T00:00:00Z`), now);
 }
 function isoAgo(now, days) {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1e3).toISOString();
@@ -24813,7 +24813,7 @@ function isoAgo(now, days) {
 async function collectUserStats(octokit, login, options = {}) {
   const now = options.now ?? /* @__PURE__ */ new Date();
   const closedSince = isoAgo(now, CLOSED_ISSUE_WINDOW_DAYS).slice(0, 10);
-  const antwort = await octokit.graphql(QUERY, {
+  const response = await octokit.graphql(QUERY, {
     login,
     from7: isoAgo(now, COMMIT_WINDOW_DAYS),
     fromWindow: isoAgo(now, USER_ACTIVITY_WINDOW_DAYS),
@@ -24825,18 +24825,18 @@ async function collectUserStats(octokit, login, options = {}) {
     openQ: `user:${login} is:issue is:open archived:false`,
     closedQ: `user:${login} is:issue is:closed closed:>=${closedSince} archived:false`
   });
-  const user = antwort.user;
+  const user = response.user;
   if (!user) {
-    throw new Error(`Benutzer "${login}" nicht gefunden oder fuer dieses Token nicht sichtbar.`);
+    throw new Error(`User "${login}" not found, or not visible to this token.`);
   }
-  const tage = user.activity.contributionCalendar.weeks.flatMap((woche) => woche.contributionDays);
-  const zustaende = user.repositories.nodes.map((repo) => repo.defaultBranchRef?.target?.statusCheckRollup?.state);
+  const days = user.activity.contributionCalendar.weeks.flatMap((week) => week.contributionDays);
+  const ciStates = user.repositories.nodes.map((repo) => repo.defaultBranchRef?.target?.statusCheckRollup?.state);
   return {
     commitsLast7Days: user.commits.totalCommitContributions,
-    daysSinceLastCommit: daysSinceLastActivity(tage, now),
-    openIssues: antwort.open.issueCount,
-    closedIssuesLast30Days: antwort.closed.issueCount,
-    lastWorkflowConclusion: ciCrossSection(zustaende)
+    daysSinceLastCommit: daysSinceLastActivity(days, now),
+    openIssues: response.open.issueCount,
+    closedIssuesLast30Days: response.closed.issueCount,
+    lastWorkflowConclusion: ciCrossSection(ciStates)
   };
 }
 
@@ -24851,16 +24851,16 @@ function buildSummary(result, inputs) {
   if (result.svgUrl !== "") {
     lines.push(`<img src="${result.svgUrl}" alt="repo-pet: ${state.mood}" width="112" height="120">`, "");
   }
-  lines.push("| | |", "| --- | --- |", `| Stimmung | \`${state.mood}\` |`, `| Saettigung | ${state.satiety} / 100 |`, `| Gesundheit | ${state.health} / 100 |`, `| Gemessen an | \`${describeSubject(inputs.subject)}\` |`, "", "<details><summary>Rohdaten</summary>", "", "```json", JSON.stringify(stats, null, 2), "```", "", "</details>");
-  const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
+  lines.push("| | |", "| --- | --- |", `| Mood | \`${state.mood}\` |`, `| Satiety | ${state.satiety} / 100 |`, `| Health | ${state.health} / 100 |`, `| Measured | \`${describeSubject(inputs.subject)}\` |`, "", "<details><summary>Raw data</summary>", "", "```json", JSON.stringify(stats, null, 2), "```", "", "</details>");
+  const location = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
   if (result.outcome === "created") {
-    lines.push("", `Branch \`${inputs.outputBranch}\` angelegt, SVG liegt unter ${ort}.`);
+    lines.push("", `Branch \`${inputs.outputBranch}\` created, the SVG lives at ${location}.`);
   } else if (result.outcome === "updated") {
-    lines.push("", `Aktualisiert: ${ort}.`);
+    lines.push("", `Updated: ${location}.`);
   } else if (result.outcome === "unchanged") {
-    lines.push("", `Unveraendert, kein Commit noetig. Unveraendert liegt es unter ${ort}.`);
+    lines.push("", `Unchanged, no commit needed. It still lives at ${location}.`);
   } else {
-    lines.push("", "> **dry_run** \u2013 nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.", ">", "> Kein Vorschaubild: es gibt noch keine URL, und `data:`-Bilder entfernt", "> GitHub aus Job Summaries. Der Quelltext steht unten.", "", "<details><summary>SVG-Quelltext</summary>", "", "```xml", result.svg, "```", "", "</details>");
+    lines.push("", "> **dry_run** - nothing written. No commit, no branch, no `svg_url`.", ">", "> No preview image: there is no URL yet, and GitHub strips `data:` images", "> from job summaries. The source is below.", "", "<details><summary>SVG source</summary>", "", "```xml", result.svg, "```", "", "</details>");
   }
   return lines.join("\n");
 }
@@ -24868,39 +24868,39 @@ function describeFailure(error) {
   if (error instanceof InputError)
     return error.message;
   if (error instanceof RateLimitError) {
-    const until = error.resetAt ? ` Wieder ab ${error.resetAt.toISOString()}.` : "";
-    return `GitHub-API-Kontingent erschoepft.${until}`;
+    const until = error.resetAt ? ` Available again at ${error.resetAt.toISOString()}.` : "";
+    return `GitHub API rate limit exhausted.${until}`;
   }
   const status = error?.status;
   const message = error instanceof Error ? error.message : String(error);
   if (status === 403 || /not accessible by integration/i.test(message)) {
-    return `Keine Schreibrechte (HTTP 403): ${message}
-Dem Job fehlt fast sicher die Berechtigung. In der Workflow-Datei:
+    return `No write access (HTTP 403): ${message}
+The job is almost certainly missing a permission. In your workflow file:
 
     permissions:
       contents: write
 
-Falls das schon dasteht: unter Settings > Actions > General muss "Workflow permissions" auf "Read and write" stehen, sonst wird der Block still auf Lesen begrenzt.`;
+If that is already there: under Settings > Actions > General, "Workflow permissions" has to be set to "Read and write" - otherwise the block is silently narrowed to read-only.`;
   }
   if (status === 404) {
-    return `Nicht gefunden (HTTP 404): ${message}
-Entweder stimmt \`repository\` nicht, oder das Token darf das Repo nicht sehen. Bei einem privaten Repo braucht der Job \`contents: read\`.`;
+    return `Not found (HTTP 404): ${message}
+Either \`repository\` is wrong, or the token cannot see the repository. A private repository needs \`contents: read\` on the job.`;
   }
   return message;
 }
 async function runAction(deps) {
   const { octokit, inputs, io: io2 } = deps;
-  const zeit = deps.now ? { now: deps.now } : {};
-  const stats = inputs.subject.kind === "user" ? await collectUserStats(octokit, inputs.subject.login, zeit) : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, zeit);
+  const when = deps.now ? { now: deps.now } : {};
+  const stats = inputs.subject.kind === "user" ? await collectUserStats(octokit, inputs.subject.login, when) : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, when);
   const state = deriveState(stats);
   const svg = renderPet(state);
-  io2.info(`${describeSubject(inputs.subject)}: ${state.mood} (Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`);
+  io2.info(`${describeSubject(inputs.subject)}: ${state.mood} (satiety ${state.satiety}, health ${state.health}, ${svg.length} bytes SVG)`);
   io2.setOutput("mood", state.mood);
   io2.setOutput("satiety", String(state.satiety));
   io2.setOutput("health", String(state.health));
   let result;
   if (inputs.dryRun) {
-    io2.info("dry_run: nichts geschrieben.");
+    io2.info("dry_run: nothing written.");
     io2.setOutput("svg_url", "");
     result = { stats, state, svg, svgUrl: "", outcome: "dry-run" };
   } else {
@@ -24910,11 +24910,11 @@ async function runAction(deps) {
       branch: inputs.outputBranch,
       path: inputs.outputFilename,
       content: svg,
-      message: `repo-pet: ${state.mood} (Saettigung ${state.satiety}, Gesundheit ${state.health})`
+      message: `repo-pet: ${state.mood} (satiety ${state.satiety}, health ${state.health})`
     });
     const svgUrl = svgRawUrl(inputs);
     io2.setOutput("svg_url", svgUrl);
-    io2.info(published.outcome === "unchanged" ? "Unveraendert, kein Commit." : `${published.outcome === "created" ? "Branch angelegt" : "Aktualisiert"}: ${published.commitSha}`);
+    io2.info(published.outcome === "unchanged" ? "Unchanged, no commit." : `${published.outcome === "created" ? "Branch created" : "Updated"}: ${published.commitSha}`);
     result = { stats, state, svg, svgUrl, outcome: published.outcome };
   }
   await io2.writeSummary(buildSummary(result, inputs));

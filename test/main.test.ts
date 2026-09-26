@@ -225,7 +225,7 @@ describe("buildSummary", () => {
 
   it("nennt Zustand und Rohdaten", () => {
     const markdown = buildSummary(ergebnis("dry-run", ""), INPUTS);
-    expect(markdown).toContain("| Saettigung | 55 / 100 |");
+    expect(markdown).toContain("| Satiety | 55 / 100 |");
     expect(markdown).toContain("commitsLast7Days");
   });
 
@@ -241,8 +241,8 @@ describe("buildSummary", () => {
   it("bei dry_run gibt es kein Bild, dafuer den Quelltext und den Grund", () => {
     const markdown = buildSummary(ergebnis("dry-run", ""), INPUTS);
     expect(markdown).not.toContain("<img");
-    expect(markdown).toContain("SVG-Quelltext");
-    expect(markdown).toContain("Kein Vorschaubild");
+    expect(markdown).toContain("SVG source");
+    expect(markdown).toContain("No preview image");
   });
 });
 

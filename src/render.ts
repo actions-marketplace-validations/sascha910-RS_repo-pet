@@ -354,7 +354,7 @@ export function renderSprite(sprite: PetSprite, state: PetState): string {
   const style = sprite.frames.length > 1 ? animationStyle(sprite) : "";
   const body = sprite.frames.length > 1 ? frames.join("") : frames[0]?.replace(/ class="[^"]*"/, "") ?? "";
 
-  const label = `Repo-Pet: ${state.mood}, Saettigung ${state.satiety}, Gesundheit ${state.health}`;
+  const label = `repo-pet: ${state.mood}, satiety ${state.satiety}, health ${state.health}`;
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}" ` +

@@ -177,7 +177,7 @@ describe("publishSvg – Pfad zeigt auf ein Verzeichnis", () => {
       "repos.getContent": () => [{ name: "pet.svg" }],
     });
 
-    await expect(publishSvg(octokit, REQUEST)).rejects.toThrow(/Verzeichnis/);
+    await expect(publishSvg(octokit, REQUEST)).rejects.toThrow(/is a directory/);
     expect(routes()).not.toContain("git.createTree");
   });
 });

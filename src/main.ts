@@ -102,12 +102,12 @@ export function buildSummary(result: ActionResult, inputs: ActionInputs): string
   lines.push(
     "| | |",
     "| --- | --- |",
-    `| Stimmung | \`${state.mood}\` |`,
-    `| Saettigung | ${state.satiety} / 100 |`,
-    `| Gesundheit | ${state.health} / 100 |`,
-    `| Gemessen an | \`${describeSubject(inputs.subject)}\` |`,
+    `| Mood | \`${state.mood}\` |`,
+    `| Satiety | ${state.satiety} / 100 |`,
+    `| Health | ${state.health} / 100 |`,
+    `| Measured | \`${describeSubject(inputs.subject)}\` |`,
     "",
-    "<details><summary>Rohdaten</summary>",
+    "<details><summary>Raw data</summary>",
     "",
     "```json",
     JSON.stringify(stats, null, 2),
@@ -116,23 +116,23 @@ export function buildSummary(result: ActionResult, inputs: ActionInputs): string
     "</details>",
   );
 
-  const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
+  const location = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
 
   if (result.outcome === "created") {
-    lines.push("", `Branch \`${inputs.outputBranch}\` angelegt, SVG liegt unter ${ort}.`);
+    lines.push("", `Branch \`${inputs.outputBranch}\` created, the SVG lives at ${location}.`);
   } else if (result.outcome === "updated") {
-    lines.push("", `Aktualisiert: ${ort}.`);
+    lines.push("", `Updated: ${location}.`);
   } else if (result.outcome === "unchanged") {
-    lines.push("", `Unveraendert, kein Commit noetig. Unveraendert liegt es unter ${ort}.`);
+    lines.push("", `Unchanged, no commit needed. It still lives at ${location}.`);
   } else {
     lines.push(
       "",
-      "> **dry_run** – nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.",
+      "> **dry_run** - nothing written. No commit, no branch, no `svg_url`.",
       ">",
-      "> Kein Vorschaubild: es gibt noch keine URL, und `data:`-Bilder entfernt",
-      "> GitHub aus Job Summaries. Der Quelltext steht unten.",
+      "> No preview image: there is no URL yet, and GitHub strips `data:` images",
+      "> from job summaries. The source is below.",
       "",
-      "<details><summary>SVG-Quelltext</summary>",
+      "<details><summary>SVG source</summary>",
       "",
       "```xml",
       result.svg,
@@ -157,8 +157,8 @@ export function describeFailure(error: unknown): string {
   if (error instanceof InputError) return error.message;
 
   if (error instanceof RateLimitError) {
-    const until = error.resetAt ? ` Wieder ab ${error.resetAt.toISOString()}.` : "";
-    return `GitHub-API-Kontingent erschoepft.${until}`;
+    const until = error.resetAt ? ` Available again at ${error.resetAt.toISOString()}.` : "";
+    return `GitHub API rate limit exhausted.${until}`;
   }
 
   const status = (error as { status?: number } | null)?.status;
@@ -166,20 +166,20 @@ export function describeFailure(error: unknown): string {
 
   if (status === 403 || /not accessible by integration/i.test(message)) {
     return (
-      `Keine Schreibrechte (HTTP 403): ${message}\n` +
-      "Dem Job fehlt fast sicher die Berechtigung. In der Workflow-Datei:\n" +
+      `No write access (HTTP 403): ${message}\n` +
+      "The job is almost certainly missing a permission. In your workflow file:\n" +
       "\n    permissions:\n      contents: write\n\n" +
-      "Falls das schon dasteht: unter Settings > Actions > General muss " +
-      '"Workflow permissions" auf "Read and write" stehen, sonst wird der ' +
-      "Block still auf Lesen begrenzt."
+      'If that is already there: under Settings > Actions > General, "Workflow ' +
+      'permissions" has to be set to "Read and write" - otherwise the block is ' +
+      "silently narrowed to read-only."
     );
   }
 
   if (status === 404) {
     return (
-      `Nicht gefunden (HTTP 404): ${message}\n` +
-      "Entweder stimmt `repository` nicht, oder das Token darf das Repo nicht " +
-      "sehen. Bei einem privaten Repo braucht der Job `contents: read`."
+      `Not found (HTTP 404): ${message}\n` +
+      "Either `repository` is wrong, or the token cannot see the repository. " +
+      "A private repository needs `contents: read` on the job."
     );
   }
 
@@ -197,19 +197,19 @@ export function describeFailure(error: unknown): string {
 export async function runAction(deps: ActionDeps): Promise<ActionResult> {
   const { octokit, inputs, io } = deps;
 
-  const zeit = deps.now ? { now: deps.now } : {};
+  const when = deps.now ? { now: deps.now } : {};
   // Zwei Sammler, eine Struktur: beide liefern `RepoStats`, damit alles
   // dahinter – Ableitung, Renderer, Tests – den Unterschied nicht kennt.
   const stats =
     inputs.subject.kind === "user"
-      ? await collectUserStats(octokit, inputs.subject.login, zeit)
-      : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, zeit);
+      ? await collectUserStats(octokit, inputs.subject.login, when)
+      : await collectStats(octokit, inputs.subject.repo.owner, inputs.subject.repo.repo, when);
   const state = deriveState(stats);
   const svg = renderPet(state);
 
   io.info(
     `${describeSubject(inputs.subject)}: ${state.mood} ` +
-      `(Saettigung ${state.satiety}, Gesundheit ${state.health}, ${svg.length} Bytes SVG)`,
+      `(satiety ${state.satiety}, health ${state.health}, ${svg.length} bytes SVG)`,
   );
 
   io.setOutput("mood", state.mood);
@@ -219,7 +219,7 @@ export async function runAction(deps: ActionDeps): Promise<ActionResult> {
   let result: ActionResult;
 
   if (inputs.dryRun) {
-    io.info("dry_run: nichts geschrieben.");
+    io.info("dry_run: nothing written.");
     // Absichtlich leer statt der spaeteren URL: ein nachgelagerter Schritt,
     // der `svg_url` einbettet, zeigte sonst auf eine Datei, die es nicht gibt.
     io.setOutput("svg_url", "");
@@ -232,16 +232,16 @@ export async function runAction(deps: ActionDeps): Promise<ActionResult> {
       path: inputs.outputFilename,
       content: svg,
       message:
-        `repo-pet: ${state.mood} (Saettigung ${state.satiety}, ` +
-        `Gesundheit ${state.health})`,
+        `repo-pet: ${state.mood} (satiety ${state.satiety}, ` +
+        `health ${state.health})`,
     });
 
     const svgUrl = svgRawUrl(inputs);
     io.setOutput("svg_url", svgUrl);
     io.info(
       published.outcome === "unchanged"
-        ? "Unveraendert, kein Commit."
-        : `${published.outcome === "created" ? "Branch angelegt" : "Aktualisiert"}: ${published.commitSha}`,
+        ? "Unchanged, no commit."
+        : `${published.outcome === "created" ? "Branch created" : "Updated"}: ${published.commitSha}`,
     );
     result = { stats, state, svg, svgUrl, outcome: published.outcome };
   }

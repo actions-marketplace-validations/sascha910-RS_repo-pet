@@ -87,7 +87,7 @@ export class InputError extends Error {
 export function parseRepoRef(value: string, label: string): RepoRef {
   const match = /^([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(value.trim());
   if (!match?.[1] || !match[2]) {
-    throw new InputError(`${label}: "${value}" ist kein owner/repo.`);
+    throw new InputError(`${label}: "${value}" is not in owner/repo form.`);
   }
   return { owner: match[1], repo: match[2] };
 }
@@ -104,7 +104,7 @@ export function parseBoolean(value: string, label: string): boolean {
   const normalized = value.trim().toLowerCase();
   if (normalized === "" || normalized === "false") return false;
   if (normalized === "true") return true;
-  throw new InputError(`${label}: "${value}" ist weder "true" noch "false".`);
+  throw new InputError(`${label}: "${value}" is neither "true" nor "false".`);
 }
 
 /**
@@ -116,9 +116,9 @@ export function parseBoolean(value: string, label: string): boolean {
  */
 export function checkFilename(value: string): string {
   const name = value.trim();
-  if (name === "") throw new InputError("output_filename ist leer.");
-  if (name.startsWith("/")) throw new InputError(`output_filename: "${name}" darf nicht mit / beginnen.`);
-  if (name.split("/").includes("..")) throw new InputError(`output_filename: "${name}" darf kein ".." enthalten.`);
+  if (name === "") throw new InputError("output_filename is empty.");
+  if (name.startsWith("/")) throw new InputError(`output_filename: "${name}" must not start with a slash.`);
+  if (name.split("/").includes("..")) throw new InputError(`output_filename: "${name}" must not contain "..".`);
   return name;
 }
 
@@ -127,8 +127,8 @@ export function readInputs(source: InputSource): ActionInputs {
   const githubToken = source.getInput("github_token").trim();
   if (githubToken === "") {
     throw new InputError(
-      "github_token fehlt. Ueblich ist `github_token: ${{ github.token }}` im " +
-        "with-Block der Action.",
+      "github_token is missing. The usual value is the github.token expression, " +
+        "passed in the action's with block.",
     );
   }
 
@@ -139,7 +139,7 @@ export function readInputs(source: InputSource): ActionInputs {
   const contextRepository = (source.env["GITHUB_REPOSITORY"] ?? "").trim();
   const sourceValue = repositoryInput !== "" ? repositoryInput : contextRepository;
   if (sourceValue === "") {
-    throw new InputError("repository ist leer und GITHUB_REPOSITORY nicht gesetzt.");
+    throw new InputError("repository is empty and GITHUB_REPOSITORY is not set.");
   }
 
   // Geschrieben wird immer ins Repo des laufenden Workflows. Nur wenn es das
@@ -147,7 +147,7 @@ export function readInputs(source: InputSource): ActionInputs {
   const targetValue = contextRepository !== "" ? contextRepository : sourceValue;
 
   const outputBranch = source.getInput("output_branch").trim();
-  if (outputBranch === "") throw new InputError("output_branch ist leer.");
+  if (outputBranch === "") throw new InputError("output_branch is empty.");
 
   // `user` schlaegt `repository`. Ein Fehler bei beiden waere hier nicht
   // umsetzbar: `repository` hat in action.yml den Default
@@ -155,7 +155,7 @@ export function readInputs(source: InputSource): ActionInputs {
   // "ausdruecklich angegeben" laesst sich von "Default" nicht unterscheiden.
   const login = source.getInput("user").trim();
   if (login !== "" && !LOGIN_PATTERN.test(login)) {
-    throw new InputError(`user: "${login}" ist kein GitHub-Benutzername.`);
+    throw new InputError(`user: "${login}" is not a GitHub username.`);
   }
   const subject: Subject =
     login !== ""

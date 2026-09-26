@@ -92,7 +92,7 @@ async function existingBlobSha(octokit: Octokit, request: PublishRequest): Promi
   const data = response.data as unknown;
   if (Array.isArray(data)) {
     throw new Error(
-      `output_filename "${request.path}" ist im Branch "${request.branch}" ein Verzeichnis.`,
+      `output_filename "${request.path}" is a directory in branch "${request.branch}".`,
     );
   }
   const file = data as { sha?: string; type?: string };
