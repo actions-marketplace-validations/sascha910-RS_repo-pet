@@ -1,0 +1,33 @@
+# Runs the published action exactly the way the README tells people to run
+# it: `uses: sascha910-RS/repo-pet@v1`, no checkout, nothing else.
+#
+# The everyday workflow (pet.yml) loads the action with `uses: ./`, which
+# only proves that the source works. It says nothing about whether the
+# released bundle, the metadata and the documented snippet actually work
+# together. This one does, and it writes nothing while doing it.
+#
+# Manual trigger only - this is a check you run after a release, not a
+# scheduled job.
+name: Verify published action
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - id: pet
+        uses: sascha910-RS/repo-pet@v1
+        with:
+          github_token: ${{ github.token }}
+          dry_run: true
+
+      - name: The outputs have to be there
+        run: |
+          test -n "${{ steps.pet.outputs.mood }}" || { echo "mood is empty"; exit 1; }
+          test -n "${{ steps.pet.outputs.satiety }}" || { echo "satiety is empty"; exit 1; }
+          echo "mood=${{ steps.pet.outputs.mood }} satiety=${{ steps.pet.outputs.satiety }}"
