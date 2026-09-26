@@ -24763,27 +24763,11 @@ function svgRawUrl(inputs) {
 }
 function buildSummary(result, inputs) {
   const { state, stats } = result;
-  const dataUri = `data:image/svg+xml;base64,${Buffer.from(result.svg, "utf8").toString("base64")}`;
-  const lines = [
-    "## repo-pet",
-    "",
-    `<img src="${dataUri}" alt="repo-pet: ${state.mood}" width="112" height="120">`,
-    "",
-    "| | |",
-    "| --- | --- |",
-    `| Stimmung | \`${state.mood}\` |`,
-    `| Saettigung | ${state.satiety} / 100 |`,
-    `| Gesundheit | ${state.health} / 100 |`,
-    `| Gemessen an | \`${inputs.source.owner}/${inputs.source.repo}\` |`,
-    "",
-    "<details><summary>Rohdaten</summary>",
-    "",
-    "```json",
-    JSON.stringify(stats, null, 2),
-    "```",
-    "",
-    "</details>"
-  ];
+  const lines = ["## repo-pet", ""];
+  if (result.svgUrl !== "") {
+    lines.push(`<img src="${result.svgUrl}" alt="repo-pet: ${state.mood}" width="112" height="120">`, "");
+  }
+  lines.push("| | |", "| --- | --- |", `| Stimmung | \`${state.mood}\` |`, `| Saettigung | ${state.satiety} / 100 |`, `| Gesundheit | ${state.health} / 100 |`, `| Gemessen an | \`${inputs.source.owner}/${inputs.source.repo}\` |`, "", "<details><summary>Rohdaten</summary>", "", "```json", JSON.stringify(stats, null, 2), "```", "", "</details>");
   const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
   if (result.outcome === "created") {
     lines.push("", `Branch \`${inputs.outputBranch}\` angelegt, SVG liegt unter ${ort}.`);
@@ -24792,7 +24776,7 @@ function buildSummary(result, inputs) {
   } else if (result.outcome === "unchanged") {
     lines.push("", `Unveraendert, kein Commit noetig. Unveraendert liegt es unter ${ort}.`);
   } else {
-    lines.push("", "> **dry_run** \u2013 nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.", "", "<details><summary>SVG-Quelltext</summary>", "", "```xml", result.svg, "```", "", "</details>");
+    lines.push("", "> **dry_run** \u2013 nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.", ">", "> Kein Vorschaubild: es gibt noch keine URL, und `data:`-Bilder entfernt", "> GitHub aus Job Summaries. Der Quelltext steht unten.", "", "<details><summary>SVG-Quelltext</summary>", "", "```xml", result.svg, "```", "", "</details>");
   }
   return lines.join("\n");
 }

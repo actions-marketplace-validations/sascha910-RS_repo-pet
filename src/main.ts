@@ -72,22 +72,33 @@ export function svgRawUrl(inputs: ActionInputs): string {
 /**
  * Die Zusammenfassung fuer den Actions-Tab.
  *
- * Das SVG haengt als `data:`-URI im Bild, weil es zum Zeitpunkt des Schreibens
- * noch keine URL hat – bei `dry_run` bekommt es auch nie eine. Ob GitHubs
- * Sanitizer `data:`-Bilder in Job Summaries durchlaesst, ist nicht
- * dokumentiert; deshalb steht die Tabelle darueber und bei `dry_run` der
- * Quelltext darunter. Faellt das Bild weg, ist die Zusammenfassung trotzdem
- * vollstaendig.
+ * Das Vorschaubild zeigt auf die abgelegte Datei und erscheint deshalb nur,
+ * wenn es sie gibt. Hier stand einmal ein `data:`-URI, damit auch ein
+ * `dry_run` die Kreatur zeigt – aber **GitHub entfernt `data:`-Bilder beim
+ * Bereinigen der Job Summary**. Angekommen ist nie etwas, und jede
+ * Zusammenfassung schleppte rund 18 KB Base64 mit. Eine `https`-URL
+ * ueberlebt die Bereinigung.
+ *
+ * Dass ein `dry_run` damit ohne Bild dasteht, ist der Preis. Der Quelltext
+ * steht dort eingeklappt darunter; mehr geht nicht, solange die Datei
+ * nirgends liegt.
  */
 export function buildSummary(result: ActionResult, inputs: ActionInputs): string {
   const { state, stats } = result;
-  const dataUri = `data:image/svg+xml;base64,${Buffer.from(result.svg, "utf8").toString("base64")}`;
 
-  const lines = [
-    "## repo-pet",
-    "",
-    `<img src="${dataUri}" alt="repo-pet: ${state.mood}" width="112" height="120">`,
-    "",
+  const lines = ["## repo-pet", ""];
+
+  if (result.svgUrl !== "") {
+    // Kurz nach einem Commit kann raw.githubusercontent.com fuer bis zu fuenf
+    // Minuten noch die vorige Fassung ausliefern (max-age=300). Fuer eine
+    // Zusammenfassung ist das hinnehmbar – siehe docs/caching.md.
+    lines.push(
+      `<img src="${result.svgUrl}" alt="repo-pet: ${state.mood}" width="112" height="120">`,
+      "",
+    );
+  }
+
+  lines.push(
     "| | |",
     "| --- | --- |",
     `| Stimmung | \`${state.mood}\` |`,
@@ -102,7 +113,7 @@ export function buildSummary(result: ActionResult, inputs: ActionInputs): string
     "```",
     "",
     "</details>",
-  ];
+  );
 
   const ort = `[\`${inputs.outputBranch}/${inputs.outputFilename}\`](${result.svgUrl})`;
 
@@ -116,6 +127,9 @@ export function buildSummary(result: ActionResult, inputs: ActionInputs): string
     lines.push(
       "",
       "> **dry_run** – nichts geschrieben. Kein Commit, kein Branch, keine `svg_url`.",
+      ">",
+      "> Kein Vorschaubild: es gibt noch keine URL, und `data:`-Bilder entfernt",
+      "> GitHub aus Job Summaries. Der Quelltext steht unten.",
       "",
       "<details><summary>SVG-Quelltext</summary>",
       "",

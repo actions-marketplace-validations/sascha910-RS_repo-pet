@@ -176,10 +176,8 @@ describe("describeFailure – Fehler, die weiterhelfen", () => {
 });
 
 describe("buildSummary", () => {
-  it("bettet das SVG als data-URI ein und legt den Quelltext daneben", () => {
-    // Ob GitHubs Sanitizer data:-Bilder durchlaesst, ist nicht dokumentiert.
-    // Deshalb muss die Zusammenfassung auch ohne das Bild vollstaendig sein.
-    const result = {
+  function ergebnis(outcome: "dry-run" | "created", svgUrl: string) {
+    return {
       stats: {
         commitsLast7Days: 3,
         daysSinceLastCommit: 1,
@@ -189,15 +187,31 @@ describe("buildSummary", () => {
       },
       state: { satiety: 55, health: 75, mood: "content" as const },
       svg: "<svg/>",
-      svgUrl: "",
-      outcome: "dry-run" as const,
+      svgUrl,
+      outcome,
     };
+  }
 
-    const markdown = buildSummary(result, INPUTS);
-    expect(markdown).toContain("data:image/svg+xml;base64,");
+  it("nennt Zustand und Rohdaten", () => {
+    const markdown = buildSummary(ergebnis("dry-run", ""), INPUTS);
     expect(markdown).toContain("| Saettigung | 55 / 100 |");
     expect(markdown).toContain("commitsLast7Days");
+  });
+
+  it("zeigt das Bild ueber die abgelegte URL, nie als data-URI", () => {
+    // GitHub entfernt data:-Bilder beim Bereinigen der Job Summary. Ein so
+    // eingebettetes SVG kam dort nie an und kostete rund 18 KB Base64 je
+    // Lauf. An einem echten Lauf nachgewiesen, nicht vermutet.
+    const markdown = buildSummary(ergebnis("created", "https://raw.example/pet.svg"), INPUTS);
+    expect(markdown).toContain('<img src="https://raw.example/pet.svg"');
+    expect(markdown).not.toContain("data:image");
+  });
+
+  it("bei dry_run gibt es kein Bild, dafuer den Quelltext und den Grund", () => {
+    const markdown = buildSummary(ergebnis("dry-run", ""), INPUTS);
+    expect(markdown).not.toContain("<img");
     expect(markdown).toContain("SVG-Quelltext");
+    expect(markdown).toContain("Kein Vorschaubild");
   });
 });
 
