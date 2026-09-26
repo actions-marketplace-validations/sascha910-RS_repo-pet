@@ -1,12 +1,17 @@
 name: "repo-pet"
 description: >-
-  Rendert den Zustand eines Repos als Tamagotchi-Kreatur und legt das SVG in
-  einem eigenen Branch ab.
+  Turns a repository's commit activity, CI status and issue hygiene into an
+  animated pixel pet, committed as an SVG to a branch of its own.
 
 branding:
   icon: "heart"
   color: "green"
 
+# Die Werte hier sind englisch, weil sie nach aussen gehen: `description`
+# ganz oben ist der Text des Marketplace-Eintrags, und die Input-Texte
+# erscheinen in der Autovervollstaendigung, wenn jemand `with:` tippt. Die
+# Kommentare bleiben deutsch - die gehoeren dem, der die Datei wartet.
+#
 # Achtung bei den Beschreibungen unten: GitHub wertet `${{ ... }}` auch in
 # `description` aus, und dort gibt es keinen `github`-Kontext. Ein Beispiel
 # in dieser Schreibweise laesst die ganze Datei nicht mehr laden
@@ -16,48 +21,48 @@ branding:
 inputs:
   github_token:
     description: >-
-      Token fuer die API. Liest Commits, Issues und Workflow-Laeufe und
-      schreibt das SVG in den Output-Branch. Der Job braucht dafuer
-      `permissions: contents: write` - das haeufigste Problem beim
-      Einrichten. Im Workflow ueblicherweise der Ausdruck `github.token`.
+      Token for the GitHub API. Reads commits, issues and workflow runs, and
+      writes the SVG to the output branch. The job needs
+      `permissions: contents: write` - the most common setup problem. In a
+      workflow this is usually the `github.token` expression.
     required: true
   output_branch:
     description: >-
-      Branch, in dem das SVG landet. Bewusst nicht der Default-Branch: die
-      Datei aendert sich taeglich und wuerde sonst die Historie des Codes
-      zumuellen. Existiert der Branch nicht, wird er als Orphan angelegt und
-      enthaelt nur diese eine Datei.
+      Branch the SVG is written to. Deliberately not your default branch: the
+      file changes daily and would bury the history of your actual code. If
+      the branch does not exist, it is created as an orphan containing
+      nothing but this one file.
     required: false
     default: "pet-output"
   output_filename:
-    description: "Dateiname im Output-Branch."
+    description: "Path inside the output branch. Subdirectories are allowed."
     required: false
     default: "pet.svg"
   repository:
     description: >-
-      Repo, dessen Zustand gemessen wird, als `owner/repo`. Der Commit geht
-      immer in das Repo, in dem der Workflow laeuft - hiermit laesst sich also
-      ein fremdes Repo beobachten.
+      The repository to measure, as `owner/repo`. The commit always goes to
+      the repository the workflow runs in, so this lets you watch someone
+      else's repository while the image lands in your own.
     required: false
     default: ${{ github.repository }}
   dry_run:
     description: >-
-      Sammelt und rendert, schreibt aber nichts. Fuer den ersten Lauf und zum
-      Pruefen der Berechtigungen, ohne einen Commit zu erzeugen.
+      Collect and render, but write nothing. For a first run and for checking
+      permissions without producing a commit.
     required: false
     default: "false"
 
 outputs:
   mood:
-    description: "Stimmung der Kreatur: happy, content, sad oder sick."
+    description: "Mood of the pet: happy, content, sad or sick."
   satiety:
-    description: "Saettigung 0-100, aus der Commit-Aktivitaet."
+    description: "Satiety 0-100, derived from commit activity."
   health:
-    description: "Gesundheit 0-100, aus CI-Status und Issue-Hygiene."
+    description: "Health 0-100, derived from CI status and issue hygiene."
   svg_url:
     description: >-
-      raw.githubusercontent.com-URL der abgelegten Datei, fertig zum Einbetten.
-      Bei `dry_run` leer, weil es nichts gibt, worauf sie zeigen koennte.
+      raw.githubusercontent.com URL of the committed file, ready to embed.
+      Empty on `dry_run`, because there is nothing for it to point at.
 
 runs:
   # Node 20 wurde am 23.09.2026 aus den Runnern entfernt, inklusive des
