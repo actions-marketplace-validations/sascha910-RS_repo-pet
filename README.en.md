@@ -38,7 +38,6 @@ jobs:
   pet:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
       - uses: sascha910-RS/repo-pet@v1
         with:
           github_token: ${{ github.token }}
