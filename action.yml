@@ -7,13 +7,19 @@ branding:
   icon: "heart"
   color: "green"
 
+# Achtung bei den Beschreibungen unten: GitHub wertet `${{ ... }}` auch in
+# `description` aus, und dort gibt es keinen `github`-Kontext. Ein Beispiel
+# in dieser Schreibweise laesst die ganze Datei nicht mehr laden
+# ("Unrecognized named-value: 'github'") - die Action ist dann tot, nicht
+# nur die Beschreibung falsch. Beispiele bleiben deshalb Prosa; die volle
+# Schreibweise steht im README.
 inputs:
   github_token:
     description: >-
       Token fuer die API. Liest Commits, Issues und Workflow-Laeufe und
       schreibt das SVG in den Output-Branch. Der Job braucht dafuer
-      `permissions: contents: write` - das haeufigste Problem beim Einrichten.
-      Ueblich ist `${{ github.token }}`.
+      `permissions: contents: write` - das haeufigste Problem beim
+      Einrichten. Im Workflow ueblicherweise der Ausdruck `github.token`.
     required: true
   output_branch:
     description: >-

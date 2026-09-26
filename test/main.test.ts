@@ -231,6 +231,21 @@ describe("action.yml passt zum Code", () => {
     expect(new Set(outputs.keys())).toEqual(new Set(Object.keys(action.outputs)));
   });
 
+  it("verwendet Ausdruecke hoechstens in Input-Defaults", () => {
+    // GitHub wertet `${{ ... }}` auch in `description` aus, und dort steht
+    // der github-Kontext nicht zur Verfuegung. Ein Beispiel in dieser
+    // Schreibweise laesst die Action gar nicht mehr laden - sie faellt mit
+    // "Unrecognized named-value: 'github'" aus, bevor eine Zeile Code
+    // laeuft. Genau das ist einmal passiert.
+    const roh = readFileSync("action.yml", "utf8");
+    const verdaechtig = roh
+      .split("\n")
+      .map((zeile, index) => `${index + 1}: ${zeile.trim()}`)
+      .filter((zeile) => zeile.includes("${{") && !/^\d+: (#|default:)/.test(zeile));
+
+    expect(verdaechtig).toEqual([]);
+  });
+
   it("repository faellt auf den Workflow-Kontext zurueck", () => {
     expect(action.inputs["repository"]?.default).toBe("${{ github.repository }}");
   });
